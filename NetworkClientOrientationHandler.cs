@@ -37,18 +37,26 @@ namespace BugFreeProductions.Networking
 
         #endregion Lifetime
 
+         #region Ownership  
         
+        #endregion Ownership
 
         public override void OnPreTick()
+        {
+            
+        }
+
+        // CHECKS immediately after physics finishes simulating for this tick
+        public override void OnPostTick()
         {
             if (!no.IsOwner) return;
 
             if (lastSentPosition == null)
             {
-                lastSentPosition = rb.position;
+                lastSentPosition = tf.position;
             }
 
-            Vector3 currentPosition = rb.position;
+            Vector3 currentPosition = tf.position;
             Vector3 delta = currentPosition - lastSentPosition;
 
             // Call serializer to get the 8-byte payload (or null if stationary)
@@ -57,17 +65,27 @@ namespace BugFreeProductions.Networking
             if (payload != null)
             {
                 // Send payload over the network via ServerRpc
-                no.SendOrientation(payload);
+                no.SendClientOrientation(payload);
                 
                 // Update baseline position for the next tick delta calculation
                 lastSentPosition = currentPosition;
             }
         }
 
-        // CHECKS immediately after physics finishes simulating for this tick
-        public override void OnPostTick()
+        public void CorrectPosition(Vector3 correctPosition)
         {
+            // move target to the correct position sent by Server
+            tf.position = correctPosition;
+        }
+
+        public void CorrectPositionDelta(byte[] payload)
+        {
+            // do nothing if this is a host client
+            if (no.IsServerInitialized) return;
+
+            // Correct the position of an object based on its Delta of change from server
             
+            tf.position += OrientationDataSerializer.DeserializeOrientation(payload).positionData;
         }
 
 
@@ -76,9 +94,10 @@ namespace BugFreeProductions.Networking
 
 
         #region Constructors
-        public NetworkClientOrientationHandler(Rigidbody aRB, NetworkOrientation aNetworkOrientation) : base(aRB,aNetworkOrientation)
+        public NetworkClientOrientationHandler(Rigidbody aRB, NetworkOrientation aNetworkOrientation) : base(aNetworkOrientation)
         {
-
+            
+            
         }
 
         #endregion Constructors

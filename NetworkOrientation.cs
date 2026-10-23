@@ -5,6 +5,7 @@ using UnityEngine;
 using FishNet.Object;
 using FishNet.Connection;
 using System;
+using System.Collections.Generic;
 using BugFreeProductions.Spatial;
 
 namespace BugFreeProductions.Networking
@@ -27,7 +28,7 @@ namespace BugFreeProductions.Networking
         protected Vector3 targetPosition = Vector3.zero;
 
         // Type of behaviour server or client
-        protected NetworkOrientationHandler noh;
+        protected List<NetworkOrientationHandler> nohs = new List<NetworkOrientationHandler>();
 
         #endregion Vars
 
@@ -38,73 +39,43 @@ namespace BugFreeProductions.Networking
         {
             base.OnStartNetwork();
 
+            if(base.IsClientInitialized)
+            {
+                nohs.Add(new NetworkClientOrientationHandler(GetComponent<Rigidbody>(),this)) ;
+            }
+            
+
             // Select and
             if(base.IsServerInitialized)
             {
-                noh = new NetworkServerOrientationHandler(GetComponent<Rigidbody>(),this);
-            }
-
-            else
-            {
-                noh = new NetworkClientOrientationHandler(GetComponent<Rigidbody>(),this);
+                nohs.Add(new NetworkServerOrientationHandler(GetComponent<Rigidbody>(),this)) ;
             }
 
             
-        }
 
-        public override void OnStopNetwork()
-        {
-            base.OnStopNetwork();
-            // Unsubscribe to prevent memory leaks
-            if (base.TimeManager != null)
-            {
-                base.TimeManager.OnTick -= TimeManager_OnTick;
-            }
+            //base.TimeManager.OnTick += TimeManager_OnTick;
+
+            
         }
+        
         #endregion Lifecycle
 
-        #region Tick Simulation
-        private void TimeManager_OnTick()
-        {
-            if (!base.IsOwner) return;
-
-            Vector3 currentPosition = transform.position;
-            Vector3 delta = currentPosition - lastSentPosition;
-
-            // Call serializer to get the 8-byte payload (or null if stationary)
-            byte[] payload = OrientationDataSerializer.Serialize( delta, threshold);
-
-            if (payload != null)
-            {
-                // Send payload over the network via ServerRpc
-                CmdSendOrientation(payload);
-                
-                // Update baseline position for the next tick delta calculation
-                lastSentPosition = currentPosition;
-            }
-        }
-
-        // 1. APPLIES before physics simulates for this tick
-        private void TimeManager_OnPrePhysicsSimulation()
-        {
-            
-        }
-
-        // 2. CHECKS immediately after physics finishes simulating for this tick
-        private void TimeManager_OnPostPhysicsSimulation()
-        {
-            
-        }
-        #endregion Tick Simulation
+        
 
 
         #region Methods
         // Public wrapper method called by your server validation logic
-        public void SendCorrection(NetworkConnection conn, Vector3 correctPosition)
+        public void SendServerCorrection(NetworkConnection conn, Vector3 correctPosition)
         {
-            if (!base.IsServer) return;
+            if (!base.IsServerInitialized) return;
             
-            TargetSendCorrection(conn, correctPosition);
+            TargetSendServerCorrection(conn, correctPosition);
+        }
+
+        // Send Delta updates from the server
+        public void SendServerOrientationDeltas(byte[] payload)
+        {
+            ObserversServerSendOrientation(payload);
         }
         #endregion Methods
 
@@ -113,31 +84,49 @@ namespace BugFreeProductions.Networking
         [ServerRpc]
         protected void CmdSendOrientation(byte[] payload, NetworkConnection sender = null)
         {
-            if (noh != null && noh is NetworkServerOrientationHandler ncoh)
+            foreach(NetworkOrientationHandler noh in nohs)
             {
-                ncoh.RecieceCmdSendOrientation(payload,sender);
+                if (noh != null && noh is NetworkServerOrientationHandler nsoh)
+                {
+                    nsoh.ReceiveClientOrientation(payload,sender);
+                }
             }
+            
         }
 
         // access to send orientation from handler
-        public void SendOrientation(byte[] payload, NetworkConnection sender = null)
+        public void SendClientOrientation(byte[] payload, NetworkConnection sender = null)
         {
             CmdSendOrientation(payload, sender);
         }
 
         [TargetRpc]
-        protected void TargetSendCorrection(NetworkConnection conn, Vector3 correctPosition)
+        protected void TargetSendServerCorrection(NetworkConnection conn, Vector3 correctPosition)
         {
             // This code ONLY runs on the specific client targeted by 'conn'.
             // Feed this correctPosition into your interpolation/smoothing buffer!
             Debug.Log($"[Client] Received server correction. Snapping/Smoothing to: {correctPosition}");
+            foreach (NetworkOrientationHandler noh in nohs)
+            {
+                if (noh is NetworkClientOrientationHandler ncoh)
+                {
+                    ncoh.CorrectPosition(correctPosition);
+                }
+            }
         }
 
         [ObserversRpc(ExcludeOwner = true)]
-        protected void ObserversSendOrientation(byte[] payload)
+        protected void ObserversServerSendOrientation(byte[] payload)
         {
             // Only other players run this to update this player's visual orientation.
             // The local owner never triggers this code block.
+            foreach (NetworkOrientationHandler noh in nohs)
+            {
+                if (noh is NetworkClientOrientationHandler ncoh)
+                {
+                    ncoh.CorrectPositionDelta(payload);
+                }
+            }
         }
 
         #endregion NetworkRPCs

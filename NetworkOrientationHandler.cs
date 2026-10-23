@@ -8,7 +8,7 @@ namespace BugFreeProductions.Networking
     public abstract class NetworkOrientationHandler
     {
         #region Vars
-        protected Rigidbody rb = null;
+        protected Transform tf = null;
 
         protected NetworkOrientation no = null;
 
@@ -31,16 +31,24 @@ namespace BugFreeProductions.Networking
         #endregion Network Tick
 
 
+        
+
+
 
         #endregion Methods
 
 
 
         #region Constructors
-        public NetworkOrientationHandler(Rigidbody aRB, NetworkOrientation aNetworkOrientation)
+        public NetworkOrientationHandler(NetworkOrientation aNetworkOrientation)
         {
-            rb = aRB;
+            // Assign Vars
+            tf = aNetworkOrientation.transform;
             no = aNetworkOrientation;
+
+            // AddEvents
+            aNetworkOrientation.TimeManager.OnPreTick += OnPreTick;
+            aNetworkOrientation.TimeManager.OnPostTick += OnPostTick;
         }
 
 

@@ -11,13 +11,17 @@ namespace BugFreeProductions.Networking
     public class NetworkServerOrientationHandler : NetworkOrientationHandler
     {
         #region Vars
-        // Hold if there are unaplied pending delta changes
+        // Hold if there are unapplied pending delta changes
         protected bool hasPendingDelta = false;
 
         //
         protected Vector3 targetPosition;
 
         OrientationData pendingDelta;
+
+
+
+        protected Vector3 lastSentPosition;
 
         #endregion Vars
         
@@ -30,7 +34,7 @@ namespace BugFreeProductions.Networking
         #region Lifetime
         public override void OnNetStart()
         {
-            if(no.IsOwner)
+            //if(no.IsOwner)
             no.TimeManager.OnPreTick += OnPreTick;
         }
 
@@ -42,48 +46,78 @@ namespace BugFreeProductions.Networking
 
         #endregion Lifetime
 
+       
+
         public override void OnPreTick()
         {
+            if (no.Owner.IsLocalClient) return;
+
+            // Debug.Log("Server Runs Pretick and applies pending deltas");
             if (hasPendingDelta)
             {
-                targetPosition = rb.position + pendingDelta.positionData;
-                rb.MovePosition(targetPosition);
-                hasPendingDelta = false;
+                targetPosition = tf.position + pendingDelta.positionData;
+                tf.position = targetPosition;
+                //hasPendingDelta = false;
             }
         }
 
         // 2. CHECKS immediately after physics finishes simulating for this tick
         public override void OnPostTick()
         {
-            // If a collision or personal space boundary blocked movement, 
-            // rb.position will differ from _intendedPosition.
-            float discrepancy = Vector3.Distance(rb.position, targetPosition);
+            // If there is no pending delta do nothing
+            if (!hasPendingDelta) return;
 
-            if (discrepancy > 0.05f) 
+            // if the local client owns this do nothing
+            if (no.Owner.IsLocalClient)
             {
-                no.SendCorrection(no.Owner, rb.position);
+                no.SendServerOrientationDeltas(OrientationDataSerializer.Serialize(pendingDelta.positionData,no.Threshold));
+                return;
+            } 
+
+            else
+            {
+                // Debug.Log("Server Runs Posttick, calculates discrepencies, and comunicates corrections");
+                // If a collision or personal space boundary blocked movement, 
+                // rb.position will differ from _intendedPosition.
+                float discrepancy = Vector3.Distance(tf.position, targetPosition);
+
+                if (discrepancy > 0.05f) 
+                {
+                    no.SendServerCorrection(no.Owner, tf.position);
+
+                    // 2. Calculate the ACTUAL movement the server allowed (from start to final position)
+                    Vector3 actualServerDelta = tf.position - (targetPosition - pendingDelta.positionData);
+
+                    // 3. Broadcast THAT corrected delta to all other observers so everyone sees the wall collision
+                    no.SendServerOrientationDeltas(OrientationDataSerializer.Serialize(actualServerDelta, no.Threshold));
+                }
+
+                else
+                {
+                    no.SendServerOrientationDeltas(OrientationDataSerializer.Serialize(pendingDelta.positionData,no.Threshold));
+                    
+                }
             }
+            
+            hasPendingDelta = false;
+            
+            
         }
 
-        protected void TargetSendCorrection(NetworkConnection conn, Vector3 correctPosition)
-        {
-            // This code ONLY runs on the specific client targeted by 'conn'.
-            // Feed this correctPosition into your interpolation/smoothing buffer!
-            Debug.Log($"[Client] Received server correction. Snapping/Smoothing to: {correctPosition}");
-        }
+        
 
-        public void RecieceCmdSendOrientation(byte[] payload, NetworkConnection sender = null)
+        public void ReceiveClientOrientation(byte[] payload, NetworkConnection sender = null)
         {
             // Unpack the incoming 8 bytes back into your structured packet data
             OrientationDataPacket packet = OrientationDataSerializer.Deserialize(payload);
 
             // Temporary debug log to prove the data flow works end-to-end!
-            Debug.Log($"[Server] Received Packet ->" +
-                      $"Axes [Qx: {packet.qx}, Qy: {packet.qy}, Qz: {packet.qz}] | " +
-                      $"Mask: {Convert.ToString(packet.mask, 2).PadLeft(3, '0')}");
+            // Debug.Log($"[Server] Received Packet ->" +
+            //           $"Axes [Qx: {packet.qx}, Qy: {packet.qy}, Qz: {packet.qz}] | " +
+            //           $"Mask: {Convert.ToString(packet.mask, 2).PadLeft(3, '0')}");
 
             // Reconstruct delta from qx/qy/qz using mask and scaleFactor, 
-            OrientationData od = OrientationDataSerializer.DeserializeOrientation(packet);
+            OrientationData od = OrientationDataSerializer.DeserializeOrientation(payload);
 
             // then apply to server-side object state.
             pendingDelta = od;
@@ -92,7 +126,7 @@ namespace BugFreeProductions.Networking
         #endregion Methods
 
         #region Constructors
-        public NetworkServerOrientationHandler(Rigidbody aRB, NetworkOrientation aNetworkOrientation) : base(aRB,aNetworkOrientation)
+        public NetworkServerOrientationHandler(Rigidbody aRB, NetworkOrientation aNetworkOrientation) : base(aNetworkOrientation)
         {
 
         }
