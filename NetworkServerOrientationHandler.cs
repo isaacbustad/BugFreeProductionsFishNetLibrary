@@ -70,6 +70,7 @@ namespace BugFreeProductions.Networking
             // if the local client owns this do nothing
             if (no.Owner.IsLocalClient)
             {
+                Debug.Log("pending delta should be but owner is host");
                 no.SendServerOrientationDeltas(OrientationDataSerializer.Serialize(pendingDelta.positionData,no.Threshold));
                 return;
             } 
