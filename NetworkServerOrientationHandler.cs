@@ -66,7 +66,7 @@ namespace BugFreeProductions.Networking
         {
             // If there is no pending delta do nothing
             if (!hasPendingDelta) return;
-
+            Debug.Log("pending delta should be applied");
             // if the local client owns this do nothing
             if (no.Owner.IsLocalClient)
             {
@@ -121,6 +121,7 @@ namespace BugFreeProductions.Networking
 
             // then apply to server-side object state.
             pendingDelta = od;
+            hasPendingDelta = true;
         }
 
         #endregion Methods
