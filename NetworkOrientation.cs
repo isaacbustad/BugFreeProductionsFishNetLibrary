@@ -120,10 +120,13 @@ namespace BugFreeProductions.Networking
         {
             // Only other players run this to update this player's visual orientation.
             // The local owner never triggers this code block.
+            Debug.Log("Observers notified");
             foreach (NetworkOrientationHandler noh in nohs)
             {
+                Debug.Log("Observers notified and loop initiated");
                 if (noh is NetworkClientOrientationHandler ncoh)
                 {
+                    Debug.Log("Observers notified and NCOH Found");
                     ncoh.CorrectPositionDelta(payload);
                 }
             }
