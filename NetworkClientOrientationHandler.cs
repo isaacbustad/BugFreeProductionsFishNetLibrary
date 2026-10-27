@@ -95,7 +95,7 @@ namespace BugFreeProductions.Networking
 
 
         #region Constructors
-        public NetworkClientOrientationHandler(Rigidbody aRB, NetworkOrientation aNetworkOrientation) : base(aNetworkOrientation)
+        public NetworkClientOrientationHandler(NetworkOrientation aNetworkOrientation) : base(aNetworkOrientation)
         {
             
             

@@ -130,7 +130,7 @@ namespace BugFreeProductions.Networking
         #endregion Methods
 
         #region Constructors
-        public NetworkServerOrientationHandler(Rigidbody aRB, NetworkOrientation aNetworkOrientation) : base(aNetworkOrientation)
+        public NetworkServerOrientationHandler(NetworkOrientation aNetworkOrientation) : base(aNetworkOrientation)
         {
 
         }
