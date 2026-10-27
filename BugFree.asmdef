@@ -1,0 +1,10 @@
+{
+  "name": "BugFree.FishNet",
+  "references": [
+    "Unity.InputSystem",
+    "FishNet.Runtime",
+    "BugFree.Core"
+  ],
+  "autoReferenced": true,
+  "noEngineReferences": false
+}

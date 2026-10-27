@@ -1,0 +1,7 @@
+{
+  "name": "com.bugfreeproductionsfishnetlibrary",
+  "version": "1.0.0",
+  "displayName": "Bug Free Productions FishNet Library",
+  "unity": "6.3",
+  "description": "Multiplayer Bug Free Productions Library for FishNet"
+}
