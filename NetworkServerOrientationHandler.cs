@@ -3,6 +3,8 @@ using UnityEngine;
 using FishNet.Object;
 using FishNet.Connection;
 using BugFreeProductions.Spatial;
+using System.Collections;
+using System.Collections.Generic;
 
 
 
@@ -12,12 +14,16 @@ namespace BugFreeProductions.Networking
     {
         #region Vars
         // Hold if there are unapplied pending delta changes
-        protected bool hasPendingDelta = false;
+        //protected bool hasPendingDelta = false;
 
-        //
-        protected Vector3 targetPosition;
+        // last known good position
+        protected Vector3 lastPos;
 
-        OrientationData pendingDelta;
+        // target calculated position
+        protected Vector3 targetPosition = Vector3.zero;
+
+
+        protected Queue<OrientationData> pendingDeltas = new Queue<OrientationData>();
 
 
 
@@ -51,28 +57,50 @@ namespace BugFreeProductions.Networking
         public override void OnPreTick()
         {
             if (no.Owner.IsLocalClient) return;
+            Debug.Log(" Position = " + tf.position);
 
             // Debug.Log("Server Runs Pretick and applies pending deltas");
-            if (hasPendingDelta)
+            // if (hasPendingDelta)
+            // {
+                
+                
+
+            //     targetPosition = tf.position + ;
+            //     tf.position = targetPosition;
+            //     Debug.Log("Target Position = " + targetPosition + " Position = " + tf.position);
+            //     //hasPendingDelta = false;
+            // }
+
+            // store the current good position
+            lastPos = tf.position;
+
+            // apply all pending deltas
+            if (pendingDeltas.Count > 0)
             {
-                targetPosition = tf.position + pendingDelta.positionData;
+                // set target position to the current position
+                targetPosition = tf.position;
+
+                // accumulate deltas
+                while (pendingDeltas.Count > 0)
+                {
+                    targetPosition += pendingDeltas.Dequeue().positionData;
+                    
+                }
+
+                // assign new position
                 tf.position = targetPosition;
-                Debug.Log("Target Position = " + targetPosition + " Position = " + tf.position);
-                //hasPendingDelta = false;
             }
         }
 
         // 2. CHECKS immediately after physics finishes simulating for this tick
         public override void OnPostTick()
         {
-            // If there is no pending delta do nothing
-            if (!hasPendingDelta) return;
-            Debug.Log("pending delta should be applied");
+            
             // if the local client owns this do nothing
             if (no.Owner.IsLocalClient)
             {
                 Debug.Log("pending delta should be but owner is host");
-                no.SendServerOrientationDeltas(OrientationDataSerializer.Serialize(pendingDelta.positionData,no.Threshold));
+                no.SendServerOrientationDeltas(OrientationDataSerializer.Serialize(tf.position - lastPos,no.Threshold));
                 return;
             } 
 
@@ -89,20 +117,20 @@ namespace BugFreeProductions.Networking
                     no.SendServerCorrection(no.Owner, tf.position);
 
                     // 2. Calculate the ACTUAL movement the server allowed (from start to final position)
-                    Vector3 actualServerDelta = tf.position - (targetPosition - pendingDelta.positionData);
+                    Vector3 actualServerDelta = tf.position - lastPos;
 
                     // 3. Broadcast THAT corrected delta to all other observers so everyone sees the wall collision
                     no.SendServerOrientationDeltas(OrientationDataSerializer.Serialize(actualServerDelta, no.Threshold));
                 }
 
-                else
-                {
-                    no.SendServerOrientationDeltas(OrientationDataSerializer.Serialize(pendingDelta.positionData,no.Threshold));
+                // else
+                // {
+                //     no.SendServerOrientationDeltas(OrientationDataSerializer.Serialize(pendingDelta.positionData,no.Threshold));
                     
-                }
+                // }
             }
             
-            hasPendingDelta = false;
+            
             
             
         }
@@ -123,8 +151,7 @@ namespace BugFreeProductions.Networking
             OrientationData od = OrientationDataSerializer.DeserializeOrientation(payload);
 
             // then apply to server-side object state.
-            pendingDelta = od;
-            hasPendingDelta = true;
+            pendingDeltas.Enqueue(od);
         }
 
         #endregion Methods
@@ -139,13 +166,7 @@ namespace BugFreeProductions.Networking
 
 
         #region Accessors
-        public OrientationData PendingDelta
-        {
-            get
-            {
-                return pendingDelta;
-            }
-        }
+        
 
         #endregion Accessors
 
