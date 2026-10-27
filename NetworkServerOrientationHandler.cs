@@ -77,13 +77,14 @@ namespace BugFreeProductions.Networking
 
             else
             {
-                // Debug.Log("Server Runs Posttick, calculates discrepencies, and comunicates corrections");
+                Debug.Log("calculates discrepencies, and comunicates corrections");
                 // If a collision or personal space boundary blocked movement, 
                 // rb.position will differ from _intendedPosition.
                 float discrepancy = Vector3.Distance(tf.position, targetPosition);
 
                 if (discrepancy > 0.05f) 
                 {
+                    Debug.Log("Correction sent to client");
                     no.SendServerCorrection(no.Owner, tf.position);
 
                     // 2. Calculate the ACTUAL movement the server allowed (from start to final position)
