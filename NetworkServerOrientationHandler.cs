@@ -81,6 +81,8 @@ namespace BugFreeProductions.Networking
         // 2. CHECKS immediately after physics finishes simulating for this tick
         public override void OnPostTick()
         {
+            // calculate the actual change delta
+            Vector3 actualServerDelta = tf.position - lastSentPosition;
             
             // if the local client owns this do nothing
             if (no.Owner.IsLocalClient)
@@ -107,10 +109,8 @@ namespace BugFreeProductions.Networking
                     Debug.Log("Correction sent to client");
                     no.SendServerCorrection(no.Owner, tf.position);
 
-                    // 2. Calculate the ACTUAL movement the server allowed (from start to final position)
-                    Vector3 actualServerDelta = tf.position - lastSentPosition;
-
-                    // 3. Broadcast THAT corrected delta to all other observers so everyone sees the wall collision
+                    
+                    // Broadcast THAT corrected delta to all other observers so everyone sees the wall collision
                     no.SendServerOrientationDeltas(OrientationDataSerializer.Serialize(actualServerDelta, no.Threshold));
                 }
 
