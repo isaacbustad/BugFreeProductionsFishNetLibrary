@@ -17,7 +17,7 @@ namespace BugFreeProductions.Networking
         //protected bool hasPendingDelta = false;
 
         // last known good position
-        protected Vector3 lastPos;
+        protected Vector3 lastSentPosition;
 
         // target calculated position
         protected Vector3 targetPosition = Vector3.zero;
@@ -25,9 +25,6 @@ namespace BugFreeProductions.Networking
 
         protected Queue<OrientationData> pendingDeltas = new Queue<OrientationData>();
 
-
-
-        protected Vector3 lastSentPosition;
 
         #endregion Vars
         
@@ -57,22 +54,11 @@ namespace BugFreeProductions.Networking
         public override void OnPreTick()
         {
             // store the current good position
-            lastPos = tf.position;
-            
+            lastSentPosition = tf.position;
+
             if (no.Owner.IsLocalClient) return;
             Debug.Log(" Position = " + tf.position);
-
-            // Debug.Log("Server Runs Pretick and applies pending deltas");
-            // if (hasPendingDelta)
-            // {
-                
-                
-
-            //     targetPosition = tf.position + ;
-            //     tf.position = targetPosition;
-            //     Debug.Log("Target Position = " + targetPosition + " Position = " + tf.position);
-            //     //hasPendingDelta = false;
-            // }
+            
 
             // apply all pending deltas
             if (pendingDeltas.Count > 0)
@@ -100,7 +86,12 @@ namespace BugFreeProductions.Networking
             if (no.Owner.IsLocalClient)
             {
                 Debug.Log("pending delta should be but owner is host");
-                no.SendServerOrientationDeltas(OrientationDataSerializer.Serialize(tf.position - lastPos,no.Threshold));
+                // Host player broadcast
+                byte[] payload = OrientationDataSerializer.Serialize(actualServerDelta, no.Threshold);
+                if (payload != null)
+                {
+                    no.SendServerOrientationDeltas(payload);
+                }
                 return;
             } 
 
@@ -117,7 +108,7 @@ namespace BugFreeProductions.Networking
                     no.SendServerCorrection(no.Owner, tf.position);
 
                     // 2. Calculate the ACTUAL movement the server allowed (from start to final position)
-                    Vector3 actualServerDelta = tf.position - lastPos;
+                    Vector3 actualServerDelta = tf.position - lastSentPosition;
 
                     // 3. Broadcast THAT corrected delta to all other observers so everyone sees the wall collision
                     no.SendServerOrientationDeltas(OrientationDataSerializer.Serialize(actualServerDelta, no.Threshold));
