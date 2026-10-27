@@ -17,12 +17,6 @@ namespace BugFreeProductions.Networking
 
 
         #region Methods
-
-        #region Lifetime
-        public abstract void OnNetStart();
-        public abstract void OnNetStop();
-
-        #endregion Lifetime
         
 
         #region Network Tick
