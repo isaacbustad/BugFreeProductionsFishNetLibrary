@@ -74,6 +74,7 @@ namespace BugFreeProductions.Networking
 
         public void CorrectPosition(Vector3 correctPosition)
         {
+            Debug.Log("Set correct Position through targeted RPC");
             // move target to the correct position sent by Server
             tf.position = correctPosition;
         }
