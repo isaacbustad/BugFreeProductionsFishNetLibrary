@@ -114,11 +114,11 @@ namespace BugFreeProductions.Networking
                     no.SendServerOrientationDeltas(OrientationDataSerializer.Serialize(actualServerDelta, no.Threshold));
                 }
 
-                // else
-                // {
-                //     no.SendServerOrientationDeltas(OrientationDataSerializer.Serialize(pendingDelta.positionData,no.Threshold));
+                else
+                {
+                    no.SendServerOrientationDeltas(OrientationDataSerializer.Serialize(actualServerDelta,no.Threshold));
                     
-                // }
+                }
             }
             
             
