@@ -15,7 +15,7 @@ namespace BugFreeProductions.Networking
     public class NetworkClientOrientationHandler : NetworkOrientationHandler 
     {
         #region Vars
-        protected Vector3? lastSentPosition;
+        protected Vector3? lastSentPosition = null;
 
 
         #endregion Vars
@@ -28,12 +28,12 @@ namespace BugFreeProductions.Networking
         public override void OnNetStart()
         {
             // Hook up the observer delta receiver so non-owners actually update!
-            no.OnServerOrientationDeltaReceived += CorrectPositionDelta;
+            // no.OnServerOrientationDeltaReceived += CorrectPositionDelta;
         }
 
         public override void OnNetStop()
         {
-            no.OnServerOrientationDeltaReceived -= CorrectPositionDelta;
+            //no.OnServerOrientationDeltaReceived -= CorrectPositionDelta;
         }
 
         #endregion Lifetime
@@ -61,7 +61,7 @@ namespace BugFreeProductions.Networking
             }
 
             Vector3 currentPosition = tf.position;
-            Vector3 delta = currentPosition - lastSentPosition;
+            Vector3 delta = currentPosition - lastSentPosition.Value;
 
             // Call serializer to get the 8-byte payload (or null if stationary)
             byte[] payload = OrientationDataSerializer.Serialize( delta, no.Threshold);
