@@ -35,27 +35,22 @@ namespace BugFreeProductions.Networking
         #region Lifecycle
         
 
-        public override void OnStartNetwork()
+        public override void OnStartClient()
         {
-            base.OnStartNetwork();
-
-            if(base.IsClientInitialized)
+            base.OnStartClient();
+            if (!nohs.Exists(h => h is NetworkClientOrientationHandler))
             {
-                nohs.Add(new NetworkClientOrientationHandler(this)) ;
+                nohs.Add(new NetworkClientOrientationHandler(this));
             }
-            
+        }
 
-            // Select and
-            if(base.IsServerInitialized)
+        public override void OnStartServer()
+        {
+            base.OnStartServer();
+            if (!nohs.Exists(h => h is NetworkServerOrientationHandler))
             {
-                nohs.Add(new NetworkServerOrientationHandler(this)) ;
+                nohs.Add(new NetworkServerOrientationHandler(this));
             }
-
-            
-
-            //base.TimeManager.OnTick += TimeManager_OnTick;
-
-            
         }
         
         #endregion Lifecycle
