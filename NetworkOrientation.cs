@@ -41,14 +41,14 @@ namespace BugFreeProductions.Networking
 
             if(base.IsClientInitialized)
             {
-                nohs.Add(new NetworkClientOrientationHandler(GetComponent<Rigidbody>(),this)) ;
+                nohs.Add(new NetworkClientOrientationHandler(this)) ;
             }
             
 
             // Select and
             if(base.IsServerInitialized)
             {
-                nohs.Add(new NetworkServerOrientationHandler(GetComponent<Rigidbody>(),this)) ;
+                nohs.Add(new NetworkServerOrientationHandler(this)) ;
             }
 
             
