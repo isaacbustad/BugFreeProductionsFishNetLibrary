@@ -56,6 +56,9 @@ namespace BugFreeProductions.Networking
 
         public override void OnPreTick()
         {
+            // store the current good position
+            lastPos = tf.position;
+            
             if (no.Owner.IsLocalClient) return;
             Debug.Log(" Position = " + tf.position);
 
@@ -70,9 +73,6 @@ namespace BugFreeProductions.Networking
             //     Debug.Log("Target Position = " + targetPosition + " Position = " + tf.position);
             //     //hasPendingDelta = false;
             // }
-
-            // store the current good position
-            lastPos = tf.position;
 
             // apply all pending deltas
             if (pendingDeltas.Count > 0)
