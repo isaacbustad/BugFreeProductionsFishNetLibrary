@@ -34,21 +34,7 @@ namespace BugFreeProductions.Networking
 
         #region Methods
 
-        #region Lifetime
-        public override void OnNetStart()
-        {
-            
-        }
-
-        public override void OnNetStop()
-        {
-            
-        }
-
-
-        #endregion Lifetime
-
-       
+        
 
         public override void OnPreTick()
         {
