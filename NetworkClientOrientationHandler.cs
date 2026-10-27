@@ -15,7 +15,7 @@ namespace BugFreeProductions.Networking
     public class NetworkClientOrientationHandler : NetworkOrientationHandler 
     {
         #region Vars
-        protected Vector3 lastSentPosition;
+        protected Vector3? lastSentPosition;
 
 
         #endregion Vars
@@ -27,12 +27,13 @@ namespace BugFreeProductions.Networking
         #region Lifetime
         public override void OnNetStart()
         {
-            no.TimeManager.OnPreTick += OnPreTick;
+            // Hook up the observer delta receiver so non-owners actually update!
+            no.OnServerOrientationDeltaReceived += CorrectPositionDelta;
         }
 
         public override void OnNetStop()
         {
-            no.TimeManager.OnPreTick += OnPostTick;
+            no.OnServerOrientationDeltaReceived -= CorrectPositionDelta;
         }
 
         #endregion Lifetime
@@ -51,9 +52,12 @@ namespace BugFreeProductions.Networking
         {
             if (!no.IsOwner) return;
 
-            if (lastSentPosition == null)
+            // Establish baseline on the very first valid frame, then skip sending for this 
+            // single tick so we don't transmit a delta from (0,0,0) to the spawn point.
+            if (!lastSentPosition.HasValue)
             {
                 lastSentPosition = tf.position;
+                return; 
             }
 
             Vector3 currentPosition = tf.position;
