@@ -57,6 +57,7 @@ namespace BugFreeProductions.Networking
             {
                 targetPosition = tf.position + pendingDelta.positionData;
                 tf.position = targetPosition;
+                Debug.Log("Target Position = " + targetPosition + " Position = " + tf.position);
                 //hasPendingDelta = false;
             }
         }
