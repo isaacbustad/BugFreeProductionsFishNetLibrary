@@ -27,13 +27,12 @@ namespace BugFreeProductions.Networking
         #region Lifetime
         public override void OnNetStart()
         {
-            // Hook up the observer delta receiver so non-owners actually update!
-            // no.OnServerOrientationDeltaReceived += CorrectPositionDelta;
+            
         }
 
         public override void OnNetStop()
         {
-            //no.OnServerOrientationDeltaReceived -= CorrectPositionDelta;
+            
         }
 
         #endregion Lifetime

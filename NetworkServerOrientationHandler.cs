@@ -37,13 +37,12 @@ namespace BugFreeProductions.Networking
         #region Lifetime
         public override void OnNetStart()
         {
-            //if(no.IsOwner)
-            no.TimeManager.OnPreTick += OnPreTick;
+            
         }
 
         public override void OnNetStop()
         {
-            no.TimeManager.OnPreTick += OnPostTick;
+            
         }
 
 
