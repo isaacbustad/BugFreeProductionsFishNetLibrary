@@ -82,7 +82,7 @@ namespace BugFreeProductions.Networking
                 }
 
                 // calculate the actual change delta
-                Vector3 actualServerDelta = tf.position - lastSentPosition;
+                Vector3 actualServerDelta = tf.position - lastSentPosition.Value;
             
 
                 Debug.Log("pending delta should be but owner is host");
