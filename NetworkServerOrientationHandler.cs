@@ -17,7 +17,7 @@ namespace BugFreeProductions.Networking
         //protected bool hasPendingDelta = false;
 
         // last known good position
-        protected Vector3 lastSentPosition;
+        protected Vector3? lastSentPosition = null;
 
         // target calculated position
         protected Vector3 targetPosition = Vector3.zero;
@@ -40,11 +40,13 @@ namespace BugFreeProductions.Networking
 
         public override void OnPreTick()
         {
-            // store the current good position
-            lastSentPosition = tf.position;
+            
 
             if (no.Owner.IsLocalClient) return;
             Debug.Log(" Position = " + tf.position);
+
+            // store the current good position
+            lastSentPosition = tf.position;
             
 
             // apply all pending deltas
@@ -68,24 +70,42 @@ namespace BugFreeProductions.Networking
         // 2. CHECKS immediately after physics finishes simulating for this tick
         public override void OnPostTick()
         {
-            // calculate the actual change delta
-            Vector3 actualServerDelta = tf.position - lastSentPosition;
             
             // if the local client owns this do nothing
             if (no.Owner.IsLocalClient)
             {
+                // Establish baseline on the very first frame, then skip this tick
+                if (!lastSentPosition.HasValue)
+                {
+                    lastSentPosition = tf.position;
+                    return;
+                }
+
+                // calculate the actual change delta
+                Vector3 actualServerDelta = tf.position - lastSentPosition;
+            
+
                 Debug.Log("pending delta should be but owner is host");
+
                 // Host player broadcast
                 byte[] payload = OrientationDataSerializer.Serialize(actualServerDelta, no.Threshold);
                 if (payload != null)
                 {
                     no.SendServerOrientationDeltas(payload);
                 }
+
+                // store the current good position
+                lastSentPosition = tf.position;
                 return;
             } 
 
             else
             {
+                // Ensure we have a baseline value, otherwise default to current position
+                // Check for lastSentPosition and replace with tf.position if not found
+                Vector3 baseline = lastSentPosition ?? tf.position;
+                Vector3 actualServerDelta = tf.position - baseline;
+
                 Debug.Log("calculates discrepencies, and comunicates corrections");
                 // If a collision or personal space boundary blocked movement, 
                 // rb.position will differ from _intendedPosition.
