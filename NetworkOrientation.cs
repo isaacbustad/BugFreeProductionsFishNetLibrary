@@ -30,6 +30,8 @@ namespace BugFreeProductions.Networking
         // Type of behaviour server or client
         protected List<NetworkOrientationHandler> nohs = new List<NetworkOrientationHandler>();
 
+
+        [SerializeField] protected VisualSplineUpdater splineUpdater;
         #endregion Vars
 
         #region Lifecycle
@@ -132,6 +134,15 @@ namespace BugFreeProductions.Networking
 
         #region Accessors
         public float Threshold => threshold;
+
+    
+        public VisualSplineUpdater SplineUpdater
+        {
+            get
+            {                
+                return splineUpdater;
+            }
+        }
         #endregion Accessors
     }
 }

@@ -67,18 +67,46 @@ namespace BugFreeProductions.Networking
         public void CorrectPosition(Vector3 correctPosition)
         {
             Debug.Log("Set correct Position through targeted RPC");
-            // move target to the correct position sent by Server
+
+            if (no.SplineUpdater != null)
+            {
+                // Pull velocity from Rigidbody if available, otherwise zero
+                Vector3 currentVelocity = (rb != null) ? rb.linearVelocity : Vector3.zero;
+                float tickDuration = (no.TimeManager != null) ? (float)no.TimeManager.TickDelta : 0.05f;
+
+                // Push the corrected state into the spline smoothing buffer via the gateway accessor
+                no.SplineUpdater.PushPhysicalState(correctPosition, currentVelocity, tickDuration);
+            }
+            
+            // Fallback direct snap if no updater is assigned in the inspector
             tf.position = correctPosition;
+            
         }
 
         public void CorrectPositionDelta(byte[] payload)
         {
-            // do nothing if this is a host client
+            // 1. Deserialize the delta from the server payload
+            OrientationData orientationData = OrientationDataSerializer.DeserializeOrientation(payload);
+            Vector3 targetPosition = tf.position + orientationData.positionData;
+
+            // 2. Visually update via spline if the component is assigned
+            // (Both pure clients AND the host run this so remote objects render smoothly)
+            if (no.SplineUpdater != null)
+            {
+                // Pull velocity from Rigidbody if available, otherwise zero
+                Vector3 currentVelocity = (rb != null) ? rb.linearVelocity : Vector3.zero;
+                float tickDuration = (no.TimeManager != null) ? (float)no.TimeManager.TickDelta : 0.05f;
+
+                // Push the calculated target position into the spline smoothing buffer
+                no.SplineUpdater.PushPhysicalState(targetPosition, currentVelocity, tickDuration);
+            }
+
+            // 3. Update the physical body's position immediately...
+            // BUT skip this on the server/host because the server's physics simulation 
+            // is already driving the physical body authoritatively!
             if (no.IsServerInitialized) return;
 
-            // Correct the position of an object based on its Delta of change from server
-            
-            tf.position += OrientationDataSerializer.DeserializeOrientation(payload).positionData;
+            tf.position = targetPosition;
         }
 
 

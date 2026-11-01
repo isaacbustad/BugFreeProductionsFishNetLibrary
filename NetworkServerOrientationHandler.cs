@@ -144,6 +144,7 @@ namespace BugFreeProductions.Networking
             // Debug.Log($"[Server] Received Packet ->" +
             //           $"Axes [Qx: {packet.qx}, Qy: {packet.qy}, Qz: {packet.qz}] | " +
             //           $"Mask: {Convert.ToString(packet.mask, 2).PadLeft(3, '0')}");
+            
 
             // Reconstruct delta from qx/qy/qz using mask and scaleFactor, 
             OrientationData od = OrientationDataSerializer.DeserializeOrientation(payload);

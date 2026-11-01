@@ -12,6 +12,8 @@ namespace BugFreeProductions.Networking
 
         protected NetworkOrientation no = null;
 
+        protected Rigidbody rb = null;
+
         #endregion Vars
 
 
@@ -47,5 +49,7 @@ namespace BugFreeProductions.Networking
 
 
         #endregion Constructors
+
+
     }
 }
