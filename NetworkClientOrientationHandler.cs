@@ -17,6 +17,10 @@ namespace BugFreeProductions.Networking
         #region Vars
         protected Vector3? lastSentPosition = null;
 
+        private bool isSleeping = false;
+        private int stationaryTickCount = 0;
+        private const int SleepThresholdTicks = 15; // ~1/4 second of no movement before sleeping
+
 
         #endregion Vars
 
@@ -40,8 +44,6 @@ namespace BugFreeProductions.Networking
         {
             if (!no.IsOwner) return;
 
-            // Establish baseline on the very first valid frame, then skip sending for this 
-            // single tick so we don't transmit a delta from (0,0,0) to the spawn point.
             if (!lastSentPosition.HasValue)
             {
                 lastSentPosition = tf.position;
@@ -51,8 +53,37 @@ namespace BugFreeProductions.Networking
             Vector3 currentPosition = tf.position;
             Vector3 delta = currentPosition - lastSentPosition.Value;
 
-            // Call serializer to get the 8-byte payload (or null if stationary)
-            byte[] payload = OrientationDataSerializer.Serialize( delta, no.Threshold);
+            // Check if movement is below threshold to handle rest state
+            if (delta.sqrMagnitude < no.Threshold * no.Threshold)
+            {
+                stationaryTickCount++;
+                
+                // Keep baseline pinned to current position while resting so it doesn't drift
+                lastSentPosition = currentPosition; 
+
+                if (stationaryTickCount >= SleepThresholdTicks)
+                {
+                    if (!isSleeping) // Only log the exact moment it transitions to sleep
+                    {
+                        isSleeping = true;
+                        Debug.Log($"[Orientation] Object went to SLEEP after {SleepThresholdTicks} idle ticks.");
+                    }
+                    return; // Skip serialization and network send while resting
+                }
+            }
+            else
+            {
+                if (isSleeping) // Only log the exact moment it wakes up
+                {
+                    Debug.Log("[Orientation] Object WOKE UP due to movement delta.");
+                }
+
+                stationaryTickCount = 0; // Wake up immediately on movement
+                isSleeping = false;
+            }
+
+            // Call serializer to get the payload (or null if stationary)
+            byte[] payload = OrientationDataSerializer.Serialize(delta, no.Threshold);
 
             if (payload != null)
             {
