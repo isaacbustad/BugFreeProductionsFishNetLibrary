@@ -20,7 +20,7 @@ namespace BugFreeProductions.Networking
         // target calculated position
         protected Vector3 targetPosition = Vector3.zero;
 
-        protected Queue<OrientationData> pendingDeltas = new Queue<OrientationData>();
+        protected Queue<Vector3> pendingDeltas = new Queue<Vector3>();
 
         // Sleep state variables
         private bool isSleeping = false;
@@ -47,7 +47,7 @@ namespace BugFreeProductions.Networking
                 // accumulate deltas
                 while (pendingDeltas.Count > 0)
                 {
-                    targetPosition += pendingDeltas.Dequeue().positionData;
+                    targetPosition += pendingDeltas.Dequeue();
                 }
 
                 // assign new position
@@ -99,7 +99,7 @@ public override void OnPostTick()
         }
 
         // Host player broadcast
-        byte[] payload = OrientationDataSerializer.Serialize(actualServerDelta, no.Threshold);
+        byte[] payload = VectorDeltaDataSerializer.SerializeDeltaVector(actualServerDelta, no.Threshold);
         if (payload != null)
         {
             no.SendServerOrientationDeltas(payload);
@@ -151,7 +151,7 @@ public override void OnPostTick()
             no.SendServerCorrection(no.Owner, tf.position);
             
             // Broadcast corrected delta only if payload is valid
-            byte[] payload = OrientationDataSerializer.Serialize(actualServerDelta, no.Threshold);
+            byte[] payload = VectorDeltaDataSerializer.SerializeDeltaVector(actualServerDelta, no.Threshold);
             if (payload != null)
             {
                 no.SendServerOrientationDeltas(payload);
@@ -159,7 +159,7 @@ public override void OnPostTick()
         }
         else
         {
-            byte[] payload = OrientationDataSerializer.Serialize(actualServerDelta, no.Threshold);
+            byte[] payload = VectorDeltaDataSerializer.SerializeDeltaVector(actualServerDelta, no.Threshold);
             if (payload != null)
             {
                 no.SendServerOrientationDeltas(payload);
@@ -173,10 +173,10 @@ public override void OnPostTick()
         public void ReceiveClientOrientation(byte[] payload, NetworkConnection sender = null)
         {
             // Unpack the incoming 8 bytes back into your structured packet data
-            OrientationDataPacket packet = OrientationDataSerializer.Deserialize(payload);
+            VectorDeltaDataPacket packet = VectorDeltaDataSerializer.DeserializeDeltaVector(payload);
 
             // Reconstruct delta from qx/qy/qz using mask and scaleFactor, 
-            OrientationData od = OrientationDataSerializer.DeserializeOrientation(payload);
+            Vector3 od = VectorDeltaDataSerializer.DeserializeDeltaPosition(payload);
 
             // then apply to server-side object state.
             pendingDeltas.Enqueue(od);

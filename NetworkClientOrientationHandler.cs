@@ -83,7 +83,7 @@ namespace BugFreeProductions.Networking
             }
 
             // Call serializer to get the payload (or null if stationary)
-            byte[] payload = OrientationDataSerializer.Serialize(delta, no.Threshold);
+            byte[] payload = VectorDeltaDataSerializer.SerializeDeltaVector(delta, no.Threshold);
 
             if (payload != null)
             {
@@ -117,8 +117,8 @@ namespace BugFreeProductions.Networking
         public void CorrectPositionDelta(byte[] payload)
         {
             // 1. Deserialize the delta from the server payload
-            OrientationData orientationData = OrientationDataSerializer.DeserializeOrientation(payload);
-            Vector3 targetPosition = tf.position + orientationData.positionData;
+            Vector3 positionData = VectorDeltaDataSerializer.DeserializeDeltaPosition(payload);
+            Vector3 targetPosition = tf.position + positionData;
 
             // 2. Visually update via spline if the component is assigned
             // (Both pure clients AND the host run this so remote objects render smoothly)
