@@ -68,7 +68,7 @@ namespace BugFreeProductions.Networking
                         isSleeping = true;
                         Debug.Log($"[Orientation] Object went to SLEEP after {SleepThresholdTicks} idle ticks.");
                     }
-                    return; 
+                    
                 }
             }
             else
