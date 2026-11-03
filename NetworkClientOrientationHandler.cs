@@ -15,7 +15,7 @@ namespace BugFreeProductions.Networking
     public class NetworkClientOrientationHandler : NetworkOrientationHandler 
     {
         #region Vars
-        protected Vector3? lastSentPosition = null;
+        protected OrientationData? lastSentOrientation = null;
 
         private bool isSleeping = false;
         private int stationaryTickCount = 0;
@@ -44,54 +44,52 @@ namespace BugFreeProductions.Networking
         {
             if (!no.IsOwner) return;
 
-            if (!lastSentPosition.HasValue)
+            OrientationData currentOrientation = tf.OrientationData();
+
+            if (!lastSentOrientation.HasValue)
             {
-                lastSentPosition = tf.position;
+                lastSentOrientation = currentOrientation;
                 return; 
             }
 
-            Vector3 currentPosition = tf.position;
-            Vector3 delta = currentPosition - lastSentPosition.Value;
+            float positionDeltaSqr = (currentOrientation.positionData - lastSentOrientation.Value.positionData).sqrMagnitude;
+            float rotationDelta = Quaternion.Angle(currentOrientation.rotationData, lastSentOrientation.Value.rotationData);
 
-            // Check if movement is below threshold to handle rest state
-            if (delta.sqrMagnitude < no.Threshold * no.Threshold)
+            // Check if movement/rotation is below threshold to handle rest state
+            if (positionDeltaSqr < no.Threshold * no.Threshold && rotationDelta < 0.1f)
             {
                 stationaryTickCount++;
-                
-                // Keep baseline pinned to current position while resting so it doesn't drift
-                lastSentPosition = currentPosition; 
+                lastSentOrientation = currentOrientation; 
 
                 if (stationaryTickCount >= SleepThresholdTicks)
                 {
-                    if (!isSleeping) // Only log the exact moment it transitions to sleep
+                    if (!isSleeping)
                     {
                         isSleeping = true;
                         Debug.Log($"[Orientation] Object went to SLEEP after {SleepThresholdTicks} idle ticks.");
                     }
-                    return; // Skip serialization and network send while resting
+                    return; 
                 }
             }
             else
             {
-                if (isSleeping) // Only log the exact moment it wakes up
+                if (isSleeping)
                 {
-                    Debug.Log("[Orientation] Object WOKE UP due to movement delta.");
+                    Debug.Log("[Orientation] Object WOKE UP due to movement/rotation delta.");
                 }
 
-                stationaryTickCount = 0; // Wake up immediately on movement
+                stationaryTickCount = 0;
                 isSleeping = false;
             }
 
-            // Call serializer to get the payload (or null if stationary)
-            byte[] payload = VectorDeltaDataSerializer.SerializeDeltaVector(delta, no.Threshold);
+            // Call the 13-byte absolute serializer
+            AbsoluteOrientationDataPacket packet = OrientationDataSerializer.SerializeAbsoluteOrientation(currentOrientation);
+            byte[] payload = OrientationDataSerializer.SerializePackage(packet);
 
             if (payload != null)
             {
-                // Send payload over the network via ServerRpc
                 no.SendClientOrientation(payload);
-                
-                // Update baseline position for the next tick delta calculation
-                lastSentPosition = currentPosition;
+                lastSentOrientation = currentOrientation;
             }
         }
 
@@ -116,28 +114,16 @@ namespace BugFreeProductions.Networking
 
         public void CorrectPositionDelta(byte[] payload)
         {
-            // 1. Deserialize the delta from the server payload
-            Vector3 positionData = VectorDeltaDataSerializer.DeserializeDeltaPosition(payload);
-            Vector3 targetPosition = tf.position + positionData;
+            // 1. Deserialize the absolute packet from the server payload
+            AbsoluteOrientationDataPacket packet = OrientationDataSerializer.DeserializePackage(payload);
+            OrientationData targetOrientation = OrientationDataSerializer.DeserializeOrientation(packet);
 
-            // 2. Visually update via spline if the component is assigned
-            // (Both pure clients AND the host run this so remote objects render smoothly)
-            if (no.SplineUpdater != null)
-            {
-                // Pull velocity from Rigidbody if available, otherwise zero
-                Vector3 currentVelocity = (rb != null) ? rb.linearVelocity : Vector3.zero;
-                float tickDuration = (no.TimeManager != null) ? (float)no.TimeManager.TickDelta : 0.05f;
-
-                // Push the calculated target position into the spline smoothing buffer
-                no.SplineUpdater.PushPhysicalState(targetPosition, currentVelocity, tickDuration);
-            }
-
-            // 3. Update the physical body's position immediately...
-            // BUT skip this on the server/host because the server's physics simulation 
-            // is already driving the physical body authoritatively!
+            // 2. Skip direct transform overrides on the server/host because physics drives authoritatively
             if (no.IsServerInitialized) return;
 
-            tf.position = targetPosition;
+            // 3. Directly update position and rotation immediately
+            tf.position = targetOrientation.positionData;
+            tf.rotation = targetOrientation.rotationData;
         }
 
 

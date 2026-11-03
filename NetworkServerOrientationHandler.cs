@@ -20,7 +20,7 @@ namespace BugFreeProductions.Networking
         // target calculated position
         protected Vector3 targetPosition = Vector3.zero;
 
-        protected Queue<Vector3> pendingDeltas = new Queue<Vector3>();
+        protected Queue<OrientationData> pendingOrientations = new Queue<OrientationData>();
 
         // Sleep state variables
         private bool isSleeping = false;
@@ -39,15 +39,17 @@ namespace BugFreeProductions.Networking
             lastSentPosition = tf.position;
 
             // apply all pending deltas
-            if (pendingDeltas.Count > 0)
+            if (pendingOrientations.Count > 0)
             {
                 // set target position to the current position
                 targetPosition = tf.position;
 
                 // accumulate deltas
-                while (pendingDeltas.Count > 0)
+                while (pendingOrientations.Count > 0)
                 {
-                    targetPosition += pendingDeltas.Dequeue();
+                    OrientationData latest = pendingOrientations.Dequeue();
+                    targetPosition = latest.positionData;
+                    tf.rotation = latest.rotationData; // Apply absolute rotation immediately
                 }
 
                 // assign new position
@@ -55,131 +57,135 @@ namespace BugFreeProductions.Networking
             }
         }
 
-        // 2. CHECKS immediately after physics finishes simulating for this tick
-        // 2. CHECKS immediately after physics finishes simulating for this tick
-public override void OnPostTick()
-{
-    // if the local client owns this do nothing
-    if (no.Owner.IsLocalClient)
-    {
-        // Establish baseline on the very first frame, then skip this tick
-        if (!lastSentPosition.HasValue)
+        
+        public override void OnPostTick()
         {
-            lastSentPosition = tf.position;
-            return;
-        }
-
-        // calculate the actual change delta
-        Vector3 actualServerDelta = tf.position - lastSentPosition.Value;
-
-        // Check if movement is below threshold to handle rest state
-        if (actualServerDelta.sqrMagnitude < no.Threshold * no.Threshold)
-        {
-            stationaryTickCount++;
-            lastSentPosition = tf.position; // Keep baseline pinned to prevent drift
-
-            if (stationaryTickCount >= SleepThresholdTicks)
+            // if the local client owns this do nothing
+            if (no.Owner.IsLocalClient)
             {
-                if (!isSleeping)
+                // Establish baseline on the very first frame, then skip this tick
+                if (!lastSentPosition.HasValue)
                 {
-                    isSleeping = true;
-                    Debug.Log("[ServerOrientation] Host object went to SLEEP.");
+                    lastSentPosition = tf.position;
+                    return;
                 }
-                return; // Skip serialization and network send while resting
-            }
-        }
-        else
-        {
-            if (isSleeping)
-            {
-                Debug.Log("[ServerOrientation] Host object WOKE UP.");
-            }
-            stationaryTickCount = 0;
-            isSleeping = false;
-        }
 
-        // Host player broadcast
-        byte[] payload = VectorDeltaDataSerializer.SerializeDeltaVector(actualServerDelta, no.Threshold);
-        if (payload != null)
-        {
-            no.SendServerOrientationDeltas(payload);
-        }
+                // calculate the actual change delta
+                Vector3 actualServerDelta = tf.position - lastSentPosition.Value;
 
-        // store the current good position
-        lastSentPosition = tf.position;
-        return;
-    } 
-    else
-    {
-        // Ensure we have a baseline value, otherwise default to current position
-        Vector3 baseline = lastSentPosition ?? tf.position;
-        Vector3 actualServerDelta = tf.position - baseline;
-
-        // Check if movement is below threshold to handle rest state
-        if (actualServerDelta.sqrMagnitude < no.Threshold * no.Threshold)
-        {
-            stationaryTickCount++;
-            lastSentPosition = tf.position; // Keep baseline pinned
-
-            if (stationaryTickCount >= SleepThresholdTicks)
-            {
-                if (!isSleeping)
+                // Check if movement is below threshold to handle rest state
+                if (actualServerDelta.sqrMagnitude < no.Threshold * no.Threshold)
                 {
-                    isSleeping = true;
-                    Debug.Log("[ServerOrientation] Server-managed object went to SLEEP.");
+                    stationaryTickCount++;
+                    lastSentPosition = tf.position; // Keep baseline pinned to prevent drift
+
+                    if (stationaryTickCount >= SleepThresholdTicks)
+                    {
+                        if (!isSleeping)
+                        {
+                            isSleeping = true;
+                            Debug.Log("[ServerOrientation] Host object went to SLEEP.");
+                        }
+                        return; // Skip serialization and network send while resting
+                    }
                 }
-                return; // Skip calculations and sends while resting
-            }
-        }
-        else
-        {
-            if (isSleeping)
-            {
-                Debug.Log("[ServerOrientation] Server-managed object WOKE UP.");
-            }
-            stationaryTickCount = 0;
-            isSleeping = false;
-        }
+                else
+                {
+                    if (isSleeping)
+                    {
+                        Debug.Log("[ServerOrientation] Host object WOKE UP.");
+                    }
+                    stationaryTickCount = 0;
+                    isSleeping = false;
+                }
 
-        // If a collision or personal space boundary blocked movement, 
-        // position will differ from targetPosition.
-        float discrepancy = Vector3.Distance(tf.position, targetPosition);
+                // Host player broadcast
+                OrientationData currentState = tf.OrientationData();
+                AbsoluteOrientationDataPacket packet = OrientationDataSerializer.SerializeAbsoluteOrientation(currentState);
+                byte[] payload = OrientationDataSerializer.SerializePackage(packet);
 
-        if (discrepancy > 0.05f) 
-        {
-            Debug.Log("Correction sent to client");
-            no.SendServerCorrection(no.Owner, tf.position);
-            
-            // Broadcast corrected delta only if payload is valid
-            byte[] payload = VectorDeltaDataSerializer.SerializeDeltaVector(actualServerDelta, no.Threshold);
-            if (payload != null)
-            {
-                no.SendServerOrientationDeltas(payload);
-            }
-        }
-        else
-        {
-            byte[] payload = VectorDeltaDataSerializer.SerializeDeltaVector(actualServerDelta, no.Threshold);
-            if (payload != null)
-            {
-                no.SendServerOrientationDeltas(payload);
-            }
-        }
+                if (payload != null)
+                {
+                    no.SendServerOrientationDeltas(payload);
+                }
 
-        // CRITICAL FIX: Always update the baseline position for the next tick delta calculation!
-        lastSentPosition = tf.position;
-    }
+                // store the current good position
+                lastSentPosition = tf.position;
+                return;
+            } 
+            else
+            {
+                // Ensure we have a baseline value, otherwise default to current position
+                Vector3 baseline = lastSentPosition ?? tf.position;
+                Vector3 actualServerDelta = tf.position - baseline;
+
+                // Check if movement is below threshold to handle rest state
+                if (actualServerDelta.sqrMagnitude < no.Threshold * no.Threshold)
+                {
+                    stationaryTickCount++;
+                    lastSentPosition = tf.position; // Keep baseline pinned
+
+                    if (stationaryTickCount >= SleepThresholdTicks)
+                    {
+                        if (!isSleeping)
+                        {
+                            isSleeping = true;
+                            Debug.Log("[ServerOrientation] Server-managed object went to SLEEP.");
+                        }
+                        return; // Skip calculations and sends while resting
+                    }
+                }
+                else
+                {
+                    if (isSleeping)
+                    {
+                        Debug.Log("[ServerOrientation] Server-managed object WOKE UP.");
+                    }
+                    stationaryTickCount = 0;
+                    isSleeping = false;
+                }
+
+                // If a collision or personal space boundary blocked movement, 
+                // position will differ from targetPosition.
+                float discrepancy = Vector3.Distance(tf.position, targetPosition);
+
+                if (discrepancy > 0.05f) 
+                {
+                    Debug.Log("Correction sent to client");
+                    no.SendServerCorrection(no.Owner, tf.position);
+                    
+                    // Broadcast corrected delta only if payload is valid
+                    OrientationData currentState = tf.OrientationData();
+                    AbsoluteOrientationDataPacket packet = OrientationDataSerializer.SerializeAbsoluteOrientation(currentState);
+                    byte[] payload = OrientationDataSerializer.SerializePackage(packet);
+
+                    if (payload != null)
+                    {
+                        no.SendServerOrientationDeltas(payload);
 }
+                }
+                else
+                {
+                    OrientationData currentState = tf.OrientationData();
+                    AbsoluteOrientationDataPacket packet = OrientationDataSerializer.SerializeAbsoluteOrientation(currentState);
+                    byte[] payload = OrientationDataSerializer.SerializePackage(packet);
+
+                    if (payload != null)
+                    {
+                        no.SendServerOrientationDeltas(payload);
+                    }
+                }
+
+                // CRITICAL FIX: Always update the baseline position for the next tick delta calculation!
+                lastSentPosition = tf.position;
+            }
+        }
         public void ReceiveClientOrientation(byte[] payload, NetworkConnection sender = null)
         {
-            // Unpack the incoming 8 bytes back into your structured packet data
-            VectorDeltaDataPacket packet = VectorDeltaDataSerializer.DeserializeDeltaVector(payload);
+            AbsoluteOrientationDataPacket packet = OrientationDataSerializer.DeserializePackage(payload);
+            OrientationData orientation = OrientationDataSerializer.DeserializeOrientation(packet);
 
-            // Reconstruct delta from qx/qy/qz using mask and scaleFactor, 
-            Vector3 od = VectorDeltaDataSerializer.DeserializeDeltaPosition(payload);
-
-            // then apply to server-side object state.
-            pendingDeltas.Enqueue(od);
+            pendingOrientations.Enqueue(orientation);
         }
 
         #endregion Methods
