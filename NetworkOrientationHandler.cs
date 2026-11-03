@@ -45,6 +45,8 @@ namespace BugFreeProductions.Networking
             // AddEvents
             aNetworkOrientation.TimeManager.OnPreTick += OnPreTick;
             aNetworkOrientation.TimeManager.OnPostTick += OnPostTick;
+
+            rb = aNetworkOrientation.RB;
         }
 
 

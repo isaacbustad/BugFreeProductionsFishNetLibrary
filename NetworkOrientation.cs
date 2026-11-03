@@ -32,6 +32,9 @@ namespace BugFreeProductions.Networking
 
 
         [SerializeField] private OrientationReconciliation orientationReconciliation;
+
+
+        [SerializeField] private Rigidbody rb = null;
         #endregion Vars
 
         #region Lifecycle
@@ -140,6 +143,14 @@ namespace BugFreeProductions.Networking
             get
             {
                 return orientationReconciliation;
+            }
+        }
+
+        public Rigidbody RB
+        {
+            get
+            {
+                return rb;
             }
         }
         
