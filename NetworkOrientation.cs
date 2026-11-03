@@ -31,7 +31,7 @@ namespace BugFreeProductions.Networking
         protected List<NetworkOrientationHandler> nohs = new List<NetworkOrientationHandler>();
 
 
-        [SerializeField] protected VisualSplineUpdater splineUpdater;
+        [SerializeField] private OrientationReconciliation orientationReconciliation;
         #endregion Vars
 
         #region Lifecycle
@@ -135,14 +135,14 @@ namespace BugFreeProductions.Networking
         #region Accessors
         public float Threshold => threshold;
 
-    
-        public VisualSplineUpdater SplineUpdater
+        public OrientationReconciliation OrientationReconciliation
         {
             get
-            {                
-                return splineUpdater;
+            {
+                return orientationReconciliation;
             }
         }
+        
         #endregion Accessors
     }
 }

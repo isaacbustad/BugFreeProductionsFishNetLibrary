@@ -90,6 +90,15 @@ namespace BugFreeProductions.Networking
             {
                 no.SendClientOrientation(payload);
                 lastSentOrientation = currentOrientation;
+
+                // Feed the local owner's reconciliation buffer so their visual interpolates smoothly too!
+                if (no.OrientationReconciliation != null)
+                {
+                    Vector3 currentVelocity = (rb != null) ? rb.linearVelocity : Vector3.zero;
+                    float tickDuration = (no.TimeManager != null) ? (float)no.TimeManager.TickDelta : 0.05f;
+
+                    no.OrientationReconciliation.PushOrientationState(currentOrientation, currentVelocity, tickDuration);
+                }
             }
         }
 
@@ -97,15 +106,15 @@ namespace BugFreeProductions.Networking
         {
             Debug.Log("Set correct Position through targeted RPC");
 
-            if (no.SplineUpdater != null)
-            {
-                // Pull velocity from Rigidbody if available, otherwise zero
-                Vector3 currentVelocity = (rb != null) ? rb.linearVelocity : Vector3.zero;
-                float tickDuration = (no.TimeManager != null) ? (float)no.TimeManager.TickDelta : 0.05f;
+            // if (no.SplineUpdater != null)
+            // {
+            //     // Pull velocity from Rigidbody if available, otherwise zero
+            //     Vector3 currentVelocity = (rb != null) ? rb.linearVelocity : Vector3.zero;
+            //     float tickDuration = (no.TimeManager != null) ? (float)no.TimeManager.TickDelta : 0.05f;
 
-                // Push the corrected state into the spline smoothing buffer via the gateway accessor
-                no.SplineUpdater.PushPhysicalState(correctPosition, currentVelocity, tickDuration);
-            }
+            //     // Push the corrected state into the spline smoothing buffer via the gateway accessor
+            //     no.SplineUpdater.PushPhysicalState(correctPosition, currentVelocity, tickDuration);
+            // }
             
             // Fallback direct snap if no updater is assigned in the inspector
             tf.position = correctPosition;
@@ -118,10 +127,22 @@ namespace BugFreeProductions.Networking
             AbsoluteOrientationDataPacket packet = OrientationDataSerializer.DeserializePackage(payload);
             OrientationData targetOrientation = OrientationDataSerializer.DeserializeOrientation(packet);
 
-            // 2. Skip direct transform overrides on the server/host because physics drives authoritatively
+            // 2. Push state into reconciliation for smooth visual interpolation
+            if (no.OrientationReconciliation != null)
+            {
+                // Pull velocity from Rigidbody if available, otherwise zero
+                Vector3 currentVelocity = (rb != null) ? rb.linearVelocity : Vector3.zero;
+                float tickDuration = (no.TimeManager != null) ? (float)no.TimeManager.TickDelta : 0.05f;
+
+                no.OrientationReconciliation.PushOrientationState(targetOrientation, currentVelocity, tickDuration);
+            }
+
+            // 3. Skip direct transform overrides on the server/host because physics drives authoritatively
             if (no.IsServerInitialized) return;
 
-            // 3. Directly update position and rotation immediately
+            
+
+            // 4. Directly update physical position and rotation immediately (world always up to date)
             tf.position = targetOrientation.positionData;
             tf.rotation = targetOrientation.rotationData;
         }
