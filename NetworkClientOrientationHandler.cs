@@ -52,6 +52,26 @@ namespace BugFreeProductions.Networking
                 return; 
             }
 
+            // SELF-CONTAINED WAKE-UP CHECK:
+            if (isSleeping)
+            {
+                float forcedMovementSqr = (currentOrientation.positionData - lastSentOrientation.Value.positionData).sqrMagnitude;
+                float forcedRotation = Quaternion.Angle(currentOrientation.rotationData, lastSentOrientation.Value.rotationData);
+
+                // If it moved beyond threshold while "sleeping", automatically wake up!
+                if (forcedMovementSqr > (no.Threshold * no.Threshold) || forcedRotation > 0.1f)
+                {
+                    Debug.Log("[Orientation] Object automatically WOKE UP due to external position/rotation change.");
+                    isSleeping = false;
+                    stationaryTickCount = 0;
+                }
+                else
+                {
+                    // Still sleeping and hasn't moved, keep skipping transmission
+                    return;
+                }
+            }
+
             float positionDeltaSqr = (currentOrientation.positionData - lastSentOrientation.Value.positionData).sqrMagnitude;
             float rotationDelta = Quaternion.Angle(currentOrientation.rotationData, lastSentOrientation.Value.rotationData);
 
