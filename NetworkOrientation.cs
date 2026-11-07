@@ -35,6 +35,10 @@ namespace BugFreeProductions.Networking
 
 
         [SerializeField] private Rigidbody rb = null;
+
+
+        public bool IsOwner => base.IsOwner;
+        public bool IsServerInitialized => base.IsServerInitialized;
         #endregion Vars
 
         #region Lifecycle
@@ -65,11 +69,11 @@ namespace BugFreeProductions.Networking
 
         #region Methods
         // Public wrapper method called by your server validation logic
-        public void SendServerCorrection(NetworkConnection conn, Vector3 correctPosition)
+        public void SendServerCorrection(NetworkConnection conn, OrientationData correctOrientation)
         {
             if (!base.IsServerInitialized) return;
             
-            TargetSendServerCorrection(conn, correctPosition);
+            TargetSendServerCorrection(conn, correctOrientation);
         }
 
         // Send Delta updates from the server
@@ -101,33 +105,36 @@ namespace BugFreeProductions.Networking
         }
 
         [TargetRpc]
-        protected void TargetSendServerCorrection(NetworkConnection conn, Vector3 correctPosition)
+        protected void TargetSendServerCorrection(NetworkConnection conn, OrientationData correctOrientation)
         {
             // This code ONLY runs on the specific client targeted by 'conn'.
             // Feed this correctPosition into your interpolation/smoothing buffer!
-            Debug.Log($"[Client] Received server correction. Snapping/Smoothing to: {correctPosition}");
+            Debug.Log($"[Client] Received server correction. Snapping/Smoothing to: {correctOrientation}");
             foreach (NetworkOrientationHandler noh in nohs)
             {
                 if (noh is NetworkClientOrientationHandler ncoh)
                 {
-                    ncoh.CorrectPosition(correctPosition);
+                    ncoh.CorrectClientOrientation(correctOrientation);
                 }
             }
         }
 
-        [ObserversRpc(ExcludeOwner = true)]
+        [ObserversRpc(ExcludeOwner = true, ExcludeServer = true)]
         protected void ObserversServerSendOrientation(byte[] payload)
         {
+            //if (base.IsHostInitialized) return;
             // Only other players run this to update this player's visual orientation.
             // The local owner never triggers this code block.
             Debug.Log("Observers notified");
             foreach (NetworkOrientationHandler noh in nohs)
             {
+                
+
                 Debug.Log("Observers notified and loop initiated");
                 if (noh is NetworkClientOrientationHandler ncoh)
                 {
                     Debug.Log("Observers notified and NCOH Found");
-                    ncoh.CorrectPositionDelta(payload);
+                    ncoh.ReceiveOrientationObserverRPC(payload);
                 }
             }
         }

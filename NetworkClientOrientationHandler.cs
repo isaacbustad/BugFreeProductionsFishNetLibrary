@@ -13,6 +13,8 @@ namespace BugFreeProductions.Networking
     {
         #region Vars
         protected OrientationData? lastSentOrientation = null;
+
+        
         #endregion Vars
 
         #region Methods
@@ -32,7 +34,18 @@ namespace BugFreeProductions.Networking
 
             OrientationData currentOrientation = tf.OrientationData();
 
-            // Call the 13-byte absolute serializer
+            if (lastSentOrientation.HasValue)
+            {
+                float positionDeltaSqr = (currentOrientation.positionData - lastSentOrientation.Value.positionData).sqrMagnitude;
+                float rotationDelta = Quaternion.Angle(currentOrientation.rotationData, lastSentOrientation.Value.rotationData);
+
+                // Skip sending if movement is below threshold (saves bandwidth when resting)
+                if (positionDeltaSqr < no.Threshold * no.Threshold && rotationDelta < 0.1f)
+                {
+                    return; 
+                }
+            }
+
             AbsoluteOrientationDataPacket packet = OrientationDataSerializer.SerializeAbsoluteOrientation(currentOrientation);
             byte[] payload = OrientationDataSerializer.SerializePackage(packet);
 
@@ -41,27 +54,34 @@ namespace BugFreeProductions.Networking
                 no.SendClientOrientation(payload);
                 lastSentOrientation = currentOrientation;
 
-                // Feed the local owner's reconciliation buffer so their visual interpolates smoothly too!
-                if (no.OrientationReconciliation != null)
+                if (no.OrientationReconciliation != null && !no.IsHostInitialized)
                 {
                     Vector3 currentVelocity = (rb != null) ? rb.linearVelocity : Vector3.zero;
                     float tickDuration = (no.TimeManager != null) ? (float)no.TimeManager.TickDelta : 0.05f;
 
-                    no.OrientationReconciliation.PushOrientationState(currentOrientation, currentVelocity, tickDuration);
+                    no.OrientationReconciliation.PushCorrection(tickDuration);
                 }
             }
         }
 
-        public void CorrectPosition(Vector3 correctPosition)
+
+        
+
+        public void CorrectClientOrientation(OrientationData correctPosition)
         {
             Debug.Log("Set correct Position through targeted RPC");
             
             // Fallback direct snap if no updater is assigned in the inspector
-            tf.position = correctPosition;
+            tf.OrientationData(correctPosition);
         }
 
-        public void CorrectPositionDelta(byte[] payload)
+
+
+
+        public void ReceiveOrientationObserverRPC(byte[] payload)
         {
+            
+
             // 1. Deserialize the absolute packet from the server payload
             AbsoluteOrientationDataPacket packet = OrientationDataSerializer.DeserializePackage(payload);
             OrientationData targetOrientation = OrientationDataSerializer.DeserializeOrientation(packet);
@@ -73,11 +93,11 @@ namespace BugFreeProductions.Networking
                 Vector3 currentVelocity = (rb != null) ? rb.linearVelocity : Vector3.zero;
                 float tickDuration = (no.TimeManager != null) ? (float)no.TimeManager.TickDelta : 0.05f;
 
-                no.OrientationReconciliation.PushOrientationState(targetOrientation, currentVelocity, tickDuration);
+                no.OrientationReconciliation.PushCorrection(tickDuration);
             }
 
             // 3. Skip direct transform overrides on the server/host because physics drives authoritatively
-            if (no.IsServerInitialized) return;
+            if (no.IsHostInitialized) return;
 
             // 4. Directly update physical position and rotation immediately (world always up to date)
             tf.position = targetOrientation.positionData;

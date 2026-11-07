@@ -52,23 +52,39 @@ namespace BugFreeProductions.Networking
             // if the local client owns this do nothing in PreTick, handle broadcast here
             if (no.Owner.IsLocalClient)
             {
-                if (!lastSentPosition.HasValue)
+                OrientationData currentState = tf.OrientationData();
+
+                if (lastSentPosition.HasValue)
                 {
-                    lastSentPosition = tf.position;
-                    return;
+                    float positionDeltaSqr = (currentState.positionData - lastSentPosition.Value).sqrMagnitude;
+                    float rotationDelta = Quaternion.Angle(currentState.rotationData, tf.rotation);
+
+                    // Skip broadcasting if movement is below threshold to save bandwidth
+                    if (positionDeltaSqr < no.Threshold * no.Threshold && rotationDelta < 0.1f)
+                    {
+                        return;
+                    }
                 }
 
-                // Host player continuous broadcast (No sleep lockouts)
-                OrientationData currentState = tf.OrientationData();
+                // Host player continuous broadcast
                 AbsoluteOrientationDataPacket packet = OrientationDataSerializer.SerializeAbsoluteOrientation(currentState);
                 byte[] payload = OrientationDataSerializer.SerializePackage(packet);
 
                 if (payload != null)
                 {
                     no.SendServerOrientationDeltas(payload);
+                    lastSentPosition = currentState.positionData;
                 }
 
-                lastSentPosition = tf.position;
+                if (no.OrientationReconciliation != null)
+                {
+                    // Pull velocity from Rigidbody if available, otherwise zero
+                    //Vector3 currentVelocity = (rb != null) ? rb.linearVelocity : Vector3.zero;
+                    float tickDuration = (no.TimeManager != null) ? (float)no.TimeManager.TickDelta : 0.05f;
+
+                    no.OrientationReconciliation.PushCorrection(tickDuration);
+                }
+
                 return;
             } 
             else
@@ -79,19 +95,39 @@ namespace BugFreeProductions.Networking
                 if (discrepancy > 0.05f) 
                 {
                     Debug.Log("Correction sent to client");
-                    no.SendServerCorrection(no.Owner, tf.position);
+                    no.SendServerCorrection(no.Owner, tf.OrientationData());
                 }
 
                 OrientationData currentState = tf.OrientationData();
+
+                if (lastSentPosition.HasValue)
+                {
+                    float positionDeltaSqr = (currentState.positionData - lastSentPosition.Value).sqrMagnitude;
+                    float rotationDelta = Quaternion.Angle(currentState.rotationData, tf.rotation);
+
+                    if (positionDeltaSqr < no.Threshold * no.Threshold && rotationDelta < 0.1f && discrepancy <= 0.05f)
+                    {
+                        return;
+                    }
+                }
+
                 AbsoluteOrientationDataPacket packet = OrientationDataSerializer.SerializeAbsoluteOrientation(currentState);
                 byte[] payload = OrientationDataSerializer.SerializePackage(packet);
 
                 if (payload != null)
                 {
                     no.SendServerOrientationDeltas(payload);
+                    lastSentPosition = currentState.positionData;
                 }
 
-                lastSentPosition = tf.position;
+                if (no.OrientationReconciliation != null)
+                {
+                    // Pull velocity from Rigidbody if available, otherwise zero
+                    //Vector3 currentVelocity = (rb != null) ? rb.linearVelocity : Vector3.zero;
+                    float tickDuration = (no.TimeManager != null) ? (float)no.TimeManager.TickDelta : 0.05f;
+
+                    no.OrientationReconciliation.PushCorrection(tickDuration);
+                }
             }
         }
 
