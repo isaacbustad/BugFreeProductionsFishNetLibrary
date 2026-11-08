@@ -20,13 +20,19 @@ namespace BugFreeProductions.Networking
         protected Vector3 targetPosition = Vector3.zero;
 
         protected Queue<OrientationData> pendingOrientations = new Queue<OrientationData>();
+
+
+        // hold the clients sync tick if corrected
+        protected uint? correctionTick = null;
         #endregion Vars
 
         #region Methods
 
         public override void OnPreTick()
         {
+            // if I am the owner or
             if (no.Owner.IsLocalClient) return;
+            
 
             // store the current good position
             lastSentPosition = tf.position;
@@ -72,8 +78,11 @@ namespace BugFreeProductions.Networking
 
                 if (payload != null)
                 {
-                    no.SendServerOrientationDeltas(payload);
+                    no.SendServerOrientation(no.TimeManager.Tick, payload);
                     lastSentPosition = currentState.positionData;
+
+                    // set the tick a client must reach before we can correct
+                    correctionTick = no.TimeManager.Tick;
                 }
 
                 if (no.OrientationReconciliation != null)
@@ -95,7 +104,19 @@ namespace BugFreeProductions.Networking
                 if (discrepancy > 0.05f) 
                 {
                     Debug.Log("Correction sent to client");
-                    no.SendServerCorrection(no.Owner, tf.OrientationData());
+                    correctionTick = no.TimeManager.Tick;
+                    
+
+                    AbsoluteOrientationDataPacket correctionPacket = OrientationDataSerializer.SerializeAbsoluteOrientation(tf.OrientationData());
+                    byte[] correctionPayload = OrientationDataSerializer.SerializePackage(correctionPacket);
+
+                    if (correctionPayload != null)
+                    {
+                        no.SendServerOrientation(no.TimeManager.Tick, correctionPayload);                        
+
+                        // set the tick a client must reach before we can correct
+                        no.SendServerCorrection(correctionTick.Value, no.Owner, correctionPayload);
+                    }
                 }
 
                 OrientationData currentState = tf.OrientationData();
@@ -116,7 +137,7 @@ namespace BugFreeProductions.Networking
 
                 if (payload != null)
                 {
-                    no.SendServerOrientationDeltas(payload);
+                    no.SendServerOrientation( no.TimeManager.Tick, payload);
                     lastSentPosition = currentState.positionData;
                 }
 
@@ -131,8 +152,25 @@ namespace BugFreeProductions.Networking
             }
         }
 
-        public void ReceiveClientOrientation(byte[] payload, NetworkConnection sender = null)
+        public void ReceiveClientOrientation(uint aServerTick, byte[] payload, NetworkConnection sender = null)
         {
+            // Evaluate only if there is a correction tick value
+            if(correctionTick.HasValue)
+            {
+                // If the client's echoed ACK tick matches or exceeds our correction tick, they have caught up!
+                // (Make sure to handle uint wrap-around safely if comparing raw uints, or use a signed delta check)
+                if (aServerTick >= correctionTick.Value)
+                {
+                    correctionTick = null; // Clear the gate!
+                }
+                else
+                {
+                    // This packet was generated before the client saw the correction. Drop or de-prioritize it.
+                    return; 
+                }
+            }
+            
+
             AbsoluteOrientationDataPacket packet = OrientationDataSerializer.DeserializePackage(payload);
             OrientationData orientation = OrientationDataSerializer.DeserializeOrientation(packet);
 

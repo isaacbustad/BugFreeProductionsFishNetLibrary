@@ -37,8 +37,7 @@ namespace BugFreeProductions.Networking
         [SerializeField] private Rigidbody rb = null;
 
 
-        public bool IsOwner => base.IsOwner;
-        public bool IsServerInitialized => base.IsServerInitialized;
+    
         #endregion Vars
 
         #region Lifecycle
@@ -69,58 +68,58 @@ namespace BugFreeProductions.Networking
 
         #region Methods
         // Public wrapper method called by your server validation logic
-        public void SendServerCorrection(NetworkConnection conn, OrientationData correctOrientation)
+        public void SendServerCorrection(uint aServerTick, NetworkConnection conn, byte[] correctionPayload)
         {
             if (!base.IsServerInitialized) return;
             
-            TargetSendServerCorrection(conn, correctOrientation);
+            TargetSendServerCorrection( conn, aServerTick, correctionPayload);
         }
 
         // Send Delta updates from the server
-        public void SendServerOrientationDeltas(byte[] payload)
+        public void SendServerOrientation(uint aServerTick, byte[] payload)
         {
-            ObserversServerSendOrientation(payload);
+            ObserversServerSendOrientation(aServerTick, payload);
         }
         #endregion Methods
 
 
         #region NetworkRPCs
         [ServerRpc]
-        protected void CmdSendOrientation(byte[] payload, NetworkConnection sender = null)
+        protected void CmdSendOrientation(uint aServerTick, byte[] payload, NetworkConnection sender = null)
         {
             foreach(NetworkOrientationHandler noh in nohs)
             {
                 if (noh != null && noh is NetworkServerOrientationHandler nsoh)
                 {
-                    nsoh.ReceiveClientOrientation(payload,sender);
+                    nsoh.ReceiveClientOrientation(aServerTick, payload, sender);
                 }
             }
             
         }
 
         // access to send orientation from handler
-        public void SendClientOrientation(byte[] payload, NetworkConnection sender = null)
+        public void SendClientOrientation(uint aServerTick, byte[] payload, NetworkConnection sender = null)
         {
-            CmdSendOrientation(payload, sender);
+            CmdSendOrientation(aServerTick, payload, sender);
         }
 
         [TargetRpc]
-        protected void TargetSendServerCorrection(NetworkConnection conn, OrientationData correctOrientation)
+        protected void TargetSendServerCorrection( NetworkConnection conn, uint aServerTick, byte[] correctionPayload)
         {
             // This code ONLY runs on the specific client targeted by 'conn'.
             // Feed this correctPosition into your interpolation/smoothing buffer!
-            Debug.Log($"[Client] Received server correction. Snapping/Smoothing to: {correctOrientation}");
+            //Debug.Log($"[Client] Received server correction. Snapping/Smoothing to: {correctOrientation}");
             foreach (NetworkOrientationHandler noh in nohs)
             {
                 if (noh is NetworkClientOrientationHandler ncoh)
                 {
-                    ncoh.CorrectClientOrientation(correctOrientation);
+                    ncoh.CorrectClientOrientation(aServerTick, correctionPayload);
                 }
             }
         }
 
         [ObserversRpc(ExcludeOwner = true, ExcludeServer = true)]
-        protected void ObserversServerSendOrientation(byte[] payload)
+        protected void ObserversServerSendOrientation(uint aServerTick, byte[] payload)
         {
             //if (base.IsHostInitialized) return;
             // Only other players run this to update this player's visual orientation.
@@ -134,7 +133,7 @@ namespace BugFreeProductions.Networking
                 if (noh is NetworkClientOrientationHandler ncoh)
                 {
                     Debug.Log("Observers notified and NCOH Found");
-                    ncoh.ReceiveOrientationObserverRPC(payload);
+                    ncoh.ReceiveOrientationObserverRPC(aServerTick, payload);
                 }
             }
         }

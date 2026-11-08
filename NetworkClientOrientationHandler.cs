@@ -14,6 +14,10 @@ namespace BugFreeProductions.Networking
         #region Vars
         protected OrientationData? lastSentOrientation = null;
 
+        // Last recieved server tick
+        // Defaulted to max value to prevent 0 0 correction ignore
+        protected uint lastReceivedServerTick = uint.MaxValue;
+
         
         #endregion Vars
 
@@ -51,7 +55,7 @@ namespace BugFreeProductions.Networking
 
             if (payload != null)
             {
-                no.SendClientOrientation(payload);
+                no.SendClientOrientation(lastReceivedServerTick, payload);
                 lastSentOrientation = currentOrientation;
 
                 if (no.OrientationReconciliation != null && !no.IsHostInitialized)
@@ -67,19 +71,25 @@ namespace BugFreeProductions.Networking
 
         
 
-        public void CorrectClientOrientation(OrientationData correctPosition)
+        public void CorrectClientOrientation(uint aServerTick, byte[] correctionPayload)
         {
             Debug.Log("Set correct Position through targeted RPC");
-            
+            // set the last recieved server tick received
+            lastReceivedServerTick = aServerTick;
+
             // Fallback direct snap if no updater is assigned in the inspector
-            tf.OrientationData(correctPosition);
+            AbsoluteOrientationDataPacket packet = OrientationDataSerializer.DeserializePackage(correctionPayload);
+            OrientationData orientation = OrientationDataSerializer.DeserializeOrientation(packet);
+            tf.OrientationData(orientation);
         }
 
 
 
 
-        public void ReceiveOrientationObserverRPC(byte[] payload)
+        public void ReceiveOrientationObserverRPC(uint aServerTick, byte[] payload)
         {
+            // set the last received server tick
+            lastReceivedServerTick = aServerTick;
             
 
             // 1. Deserialize the absolute packet from the server payload
